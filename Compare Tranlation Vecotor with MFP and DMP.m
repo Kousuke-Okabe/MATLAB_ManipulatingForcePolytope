@@ -1,6 +1,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-%   操作力多面体と動的可操作性多面体の比較
+%   操作力多面体と動的可操作性多面体の並進ベクトルの比較
 %
 %                                                       21.09.25 by.OKB
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -12,11 +12,11 @@ clear all
 type = '2d_RRR';
 
 % set parameter
-x = [0.25; 0.2; 0];
-
-dx = [1, 0, 1, 0, 1, 0, 1, 0;
-      1, 1, 0, 0, 1, 1, 0, 0;
-      1, 1, 1, 1, 0, 0, 0, 0]; 
+% x = [0.25; 0.2; 0];
+x = [rand([2,1])*0.2; rand(1)*pi];
+%%
+dx = [0; 0; 0];
+dx = [0; 0.2; 0];
 
 ddx = [0; 0; 0];
 f = [ 0; 0; 0];
@@ -32,65 +32,61 @@ type
 param = get_parameter(type);
     Tlim = param.Tlim;
 
-[q] = fIKinematics(type, x(1:2),dx(1:2));
-% [J,Jp,U] = fJacobi(type, x(1:2),x(3));
+[J,Jp,U] = fJacobi(type, x);
+Je = [J;U'];
+Jei = [Jp, U];
+
+[q] = fIKinematics(type, x);
+[M,G] = get_matrix_minus(type,q);
 
 % View Scale
-G_MFP = diag([1/50,1/50,1/10]);
-G_DMP = diag([3*10^-4, 3*10^-4, 5*10^-6]);
+Gt = 1;
+Gz = Gt;
+G_DMP = diag([Gt, Gt, Gz]);
+G_MFP = G_DMP;
 
 % 描画
-FH = 1;
+FH = 2;
+dim = 23;
 figure(FH)
 clf(FH)
-hold on
-
-for i = 1:2^3
-    % MFP
-%     [Graph,V] = get_MFPgraph(type, x);
-%     V = G_MFP*V;
-    Vt(:,i) = get_MFPtranlate(type, x,dx(:,i),ddx,g);
-    Vt(:,i) = G_MFP*Vt(:,i);
-
-%     for i = 1:size(V,2)
-%         V(:,i) = V(:,i) + Vt + V0;
-%     end
-
-    % DMP
-%     [Graph_DMP,V_DMP] = get_DMPgraph(type, x);
-%     V_DMP = G_DMP*V_DMP;
-    Vt_DMP(:,i) = get_DMPtranlate(type, x,dx(:,i),g,f);
-    Vt_DMP(:,i) = G_DMP*Vt_DMP(:,i);
-
-%     for i = 1:size(V_DMP,2)
-%         V_DMP(:,i) = V_DMP(:,i) + Vt_DMP + V0;
-%     end
-
-    % Translation Vector
-    quiver3(V0(1),V0(2),V0(3), Vt(1,i),Vt(2,i),Vt(3,i),'b', 'AutoScaleFactor',1)
-    quiver3(V0(1),V0(2),V0(3), Vt_DMP(1,i),Vt_DMP(2,i),Vt_DMP(3,i),'m', 'AutoScaleFactor',1)
-
-end
-
-% area = axis;
-% plot3(area(1:2),zeros(2,1),zeros(2,1),'k')
-% plot3(zeros(2,1),area(3:4),zeros(2,1),'k')
 
 
-fRoboAnimation_Robo(FH,type,q,x(1:2))
+fRoboAnimation_Robo(FH,type,q)
 
-% xlim([-0.0, 0.4])
-% ylim([-0.0, 0.4])
-% zlim([-0.1, 0.1])
-set(gca, 'xtick',[0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4])
+% MFP
+Vt = get_MFPtranlate(type, x,dx,ddx,g);
+Vt = G_MFP*Vt/abs(det(Jei));
+quiver3(V0(1),V0(2),V0(3), Vt(1),Vt(2),Vt(3),'g', 'AutoScaleFactor',1)
 
+[Graph,V] = get_MFPgraph(type, x);
+V = G_MFP*V/abs(det(Jei)) + diag(Vt)*ones(size(V)) + diag(V0)*ones(size(V));
+fDraw_Graph3(FH,Graph,V,dim,'b')
+
+
+% DMP
+Vt_DMP = get_DMPtranlate(type, x,dx,g,f);
+Vt_DMP = G_DMP*Vt_DMP/abs(det(Je/M));
+quiver3(V0(1),V0(2),V0(3), Vt_DMP(1),Vt_DMP(2),Vt_DMP(3),'r', 'AutoScaleFactor',1)
+
+[Graph_DMP,V_DMP] = get_DMPgraph(type, x);
+V_DMP = G_DMP*V_DMP/abs(det(Je/M)) + diag(Vt_DMP)*ones(size(V_DMP)) + diag(V0)*ones(size(V));
+fDraw_Graph3(FH,Graph_DMP,V_DMP,dim,'m')
+
+
+% Draw setting
 xlabel('fx [N]')
 ylabel('fy [N]')
 zlabel('fz [N]')
 
-view([20,30])
-rotate3d on
+% xlim([0,1]*0.35)
+% ylim([0,1]*0.35)
+view([0,90])
+% set(gca, 'xtick', 0:0.05:0.35)
+% set(gca, 'ytick', 0:0.05:0.35)
 
+hold on
+axis square
+rotate3d on
 box off
 grid off
-
